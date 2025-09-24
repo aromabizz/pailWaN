@@ -90,6 +90,10 @@
   </div>
 
   <script>
+
+    // Replace with your own WhatsApp number (with country code)
+    const RESTAURANT_NUMBER = "917385573810";
+    
     // Sample menu (editable)
     const MENU = [
       { id: 'm1', name: 'Mutton Thali', price: 299 },
@@ -186,7 +190,7 @@
       msgLines.push('\nPlease confirm and prepare the order.');
 
       const message = encodeURIComponent(msgLines.join('\n'));
-      const waUrl = `https://wa.me/$917385573810?text=${message}`;
+      const waUrl = `https://wa.me/${RESTAURANT_NUMBER}?text=${message}`;
       window.open(waUrl, '_blank');
     });
 
