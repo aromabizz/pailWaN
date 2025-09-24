@@ -1,0 +1,198 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Quick Dine — Order via WhatsApp</title>
+  <style>
+    :root{--accent:#1f8feb;--bg:#f7f9fc;--card:#fff}
+    body{font-family:Inter,Segoe UI,Arial;background:var(--bg);margin:0;color:#0b1320}
+    header{background:linear-gradient(90deg,var(--accent),#4bbf91);color:white;padding:18px 20px}
+    .container{max-width:920px;margin:22px auto;padding:18px}
+    .card{background:var(--card);border-radius:12px;padding:18px;box-shadow:0 6px 18px rgba(10,20,40,0.06);margin-bottom:16px}
+    label{display:block;margin-bottom:6px;font-weight:600}
+    input,button,select{font-size:16px;padding:10px;border-radius:8px;border:1px solid #e3e8ef;width:100%;box-sizing:border-box}
+    .row{display:flex;gap:12px}
+    .row > *{flex:1}
+    nav{display:flex;gap:8px;margin-bottom:12px}
+    nav button{flex:1;background:white;border:1px solid #e6eef9;padding:10px;border-radius:8px}
+    .menu-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:12px}
+    .menu-item{border:1px solid #eef5fb;border-radius:10px;padding:12px;background:#fff}
+    .menu-item h4{margin:0 0 6px}
+    .menu-item p{margin:0 0 10px;color:#4b5563}
+    .qty{display:flex;gap:8px;align-items:center}
+    .summary-list{list-style:none;padding:0;margin:0}
+    .summary-list li{display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px dashed #eef2f7}
+    .right{font-weight:700}
+    .muted{color:#6b7280;font-size:13px}
+    footer{padding:18px;text-align:center;color:#374151}
+    .small{font-size:13px}
+    iframe{border:0;width:100%;height:300px;border-radius:8px;margin-top:10px}
+  </style>
+</head>
+<body>
+  <header>
+    <h1 style="margin:0;font-size:20px">Quick Dine — WhatsApp Ordering Demo</h1>
+  </header>
+
+  <div class="container">
+    <nav>
+      <button id="toPage1">1. Customer</button>
+      <button id="toPage2">2. Menu</button>
+      <button id="toPage3">3. Summary</button>
+    </nav>
+
+    <!-- PAGE 1 -->
+    <section id="page1" class="card">
+      <h3>Customer details</h3>
+      <div style="max-width:720px">
+        <label for="custName">Full name</label>
+        <input id="custName" placeholder="e.g., Rahul Sharma" />
+
+        <label for="custMobile" style="margin-top:10px">Mobile number (with country code)</label>
+        <input id="custMobile" placeholder="e.g., 919812345678" />
+
+        <div style="display:flex;gap:12px;margin-top:10px;align-items:center">
+          <button id="getLoc">Get current location</button>
+          <div class="muted small" id="locText">Location not captured</div>
+        </div>
+
+        <iframe id="mapFrame" style="display:none"></iframe>
+
+        <p class="small muted">Location uses browser Geolocation. We'll show a movable Google Map so you can fine‑tune your location for delivery.</p>
+      </div>
+    </section>
+
+    <!-- PAGE 2 -->
+    <section id="page2" class="card" style="display:none">
+      <h3>Menu — Tap quantity to add</h3>
+      <div class="menu-grid" id="menuGrid"></div>
+    </section>
+
+    <!-- PAGE 3 -->
+    <section id="page3" class="card" style="display:none">
+      <h3>Order summary</h3>
+      <ul class="summary-list" id="summaryList"></ul>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-top:12px">
+        <div class="muted">Total</div>
+        <div class="right" id="totalAmount">₹0</div>
+      </div>
+
+      <div style="margin-top:12px;display:flex;gap:8px">
+        <button id="placeOrder">Place order (WhatsApp)</button>
+        <button id="editOrder">Edit</button>
+      </div>
+
+      <p class="muted small" style="margin-top:10px">When you click Place order we'll open WhatsApp with a prefilled message (uses wa.me). Make sure the phone number you entered is correct and includes country code.</p>
+    </section>
+
+    <footer class="small muted">Demo site — drop-in menu editable from the code. Works on static GitHub Pages.</footer>
+  </div>
+
+  <script>
+    // Sample menu (editable)
+    const MENU = [
+      { id: 'm1', name: 'Margherita Pizza', price: 299 },
+      { id: 'm2', name: 'Paneer Butter Masala (Bowl)', price: 179 },
+      { id: 'm3', name: 'Veg Biryani', price: 149 },
+      { id: 'm4', name: 'French Fries (Large)', price: 99 },
+      { id: 'm5', name: 'Cold Coffee', price: 79 }
+    ];
+
+    const state = { selections: {}, loc: null, mapLink: null };
+
+    // Navigation
+    document.getElementById('toPage1').onclick = () => show('page1');
+    document.getElementById('toPage2').onclick = () => { renderMenu(); show('page2'); };
+    document.getElementById('toPage3').onclick = () => { renderSummary(); show('page3'); };
+    document.getElementById('editOrder').onclick = () => show('page2');
+
+    function show(id){['page1','page2','page3'].forEach(p=>document.getElementById(p).style.display=(p===id?'block':'none'))}
+
+    // Geolocation
+    document.getElementById('getLoc').addEventListener('click', ()=>{
+      const out = document.getElementById('locText');
+      if(!navigator.geolocation){ out.textContent='Geolocation not supported'; return; }
+      out.textContent='Requesting...';
+      navigator.geolocation.getCurrentPosition(pos=>{
+        state.loc = { lat: pos.coords.latitude, lon: pos.coords.longitude, acc: pos.coords.accuracy };
+        out.textContent = `Lat: ${state.loc.lat.toFixed(5)}, Lon: ${state.loc.lon.toFixed(5)}`;
+        // embed Google Maps iframe with draggable pin (maps embed uses q param)
+        const mapFrame = document.getElementById('mapFrame');
+        state.mapLink = `https://www.google.com/maps?q=${state.loc.lat},${state.loc.lon}&z=15&output=embed`;
+        mapFrame.src = state.mapLink;
+        mapFrame.style.display = 'block';
+      }, err=>{
+        out.textContent = 'Permission denied or unavailable';
+      }, { enableHighAccuracy:true, timeout:8000 });
+    });
+
+    // Render menu
+    function renderMenu(){
+      const grid = document.getElementById('menuGrid'); grid.innerHTML='';
+      MENU.forEach(item=>{
+        const div = document.createElement('div'); div.className='menu-item';
+        div.innerHTML = `<h4>${item.name}</h4><p class=\"muted\">₹${item.price}</p>`;
+        const qtyRow = document.createElement('div'); qtyRow.className='qty';
+        const minus = document.createElement('button'); minus.textContent='-'; minus.style.width='36px';
+        const qty = document.createElement('input'); qty.type='number'; qty.value = state.selections[item.id] ? state.selections[item.id] : 0; qty.min=0; qty.style.width='70px';
+        const plus = document.createElement('button'); plus.textContent='+'; plus.style.width='36px';
+        minus.onclick = ()=>{ qty.value = Math.max(0, Number(qty.value)-1); updateSelection(item.id, Number(qty.value)); };
+        plus.onclick = ()=>{ qty.value = Number(qty.value)+1; updateSelection(item.id, Number(qty.value)); };
+        qty.onchange = ()=> updateSelection(item.id, Number(qty.value));
+        qtyRow.appendChild(minus); qtyRow.appendChild(qty); qtyRow.appendChild(plus);
+        div.appendChild(qtyRow); grid.appendChild(div);
+      });
+    }
+
+    function updateSelection(itemId, qty){
+      if(qty<=0) delete state.selections[itemId]; else state.selections[itemId]=qty;
+    }
+
+    // Summary
+    function renderSummary(){
+      const list = document.getElementById('summaryList'); list.innerHTML='';
+      let total = 0;
+      Object.keys(state.selections).forEach(id=>{
+        const menuItem = MENU.find(m=>m.id===id);
+        const qty = state.selections[id];
+        const lineTotal = qty * menuItem.price; total += lineTotal;
+        const li = document.createElement('li');
+        li.innerHTML = `<div>${menuItem.name} × ${qty}</div><div class=\"right\">₹${lineTotal}</div>`;
+        list.appendChild(li);
+      });
+      document.getElementById('totalAmount').textContent = '₹' + total;
+    }
+
+    // Place order -> create WhatsApp link and open
+    document.getElementById('placeOrder').addEventListener('click', ()=>{
+      const name = (document.getElementById('custName').value || '').trim();
+      const mobile = (document.getElementById('custMobile').value || '').trim();
+      if(!name || !mobile){ alert('Please enter name and mobile (with country code) before placing order.'); show('page1'); return; }
+
+      let msgLines = [];
+      msgLines.push('Hi,');
+      msgLines.push(`Customer: ${name}`);
+      msgLines.push(`Mobile: ${mobile}`);
+      if(state.mapLink) msgLines.push(`Map: ${state.mapLink.replace('&output=embed','')}`);
+      msgLines.push('Order details:');
+      let total = 0;
+      Object.keys(state.selections).forEach(id=>{
+        const m = MENU.find(x=>x.id===id);
+        const q = state.selections[id];
+        const lt = q * m.price; total += lt;
+        msgLines.push(`${m.name} x${q} - ₹${lt}`);
+      });
+      msgLines.push(`Total: ₹${total}`);
+      msgLines.push('\nPlease confirm and prepare the order.');
+
+      const message = encodeURIComponent(msgLines.join('\n'));
+      const waUrl = `https://wa.me/${mobile}?text=${message}`;
+      window.open(waUrl, '_blank');
+    });
+
+    // initial render
+    renderMenu();
+  </script>
+</body>
+</html>
